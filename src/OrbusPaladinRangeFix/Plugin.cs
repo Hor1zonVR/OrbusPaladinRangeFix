@@ -4,7 +4,7 @@ using BepInEx.Unity.IL2CPP;
 
 namespace OrbusPaladinRangeFix;
 
-[BepInPlugin("com.horizon.orbuspaladinrangefix", "OrbusPaladinRangeFix", "0.1.0")]
+[BepInPlugin("com.horizon.orbuspaladinrangefix", "OrbusPaladinRangeFix", "0.1.1")]
 public sealed class Plugin : BasePlugin
 {
     internal static BepInEx.Logging.ManualLogSource Logger = null!;
@@ -27,7 +27,7 @@ public sealed class Plugin : BasePlugin
 
         AddComponent<MechanicsDiagnostics>();
         Log.LogInfo("[PaladinRangeFix] v0.1.0 READ-ONLY diagnostic build loaded.");
-        Log.LogInfo("[PaladinRangeFix] F8=Paladin 60s, F9=mount/combat 90s, F10=local hierarchy, F11=event marker.");
+        Log.LogInfo("[PaladinRangeFix] Ctrl+Alt+P=Paladin, Ctrl+Alt+M=mount/combat, Ctrl+Alt+O=hierarchy, Ctrl+Alt+K=marker.");
         Log.LogInfo("[PaladinRangeFix] No teleport changes, no mount automation, no gameplay patches in this build.");
     }
 }
