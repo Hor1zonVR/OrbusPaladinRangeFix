@@ -84,7 +84,7 @@ $sha = (& git rev-parse HEAD).Trim()
 Assert-OK 'Read commit'
 $args = @('release','create',$tag,$dll,'--repo',$repo,'--target',$sha,
     '--title',"OrbusPaladinRangeFix $tag (Diagnostics)",
-    '--notes','READ-ONLY Paladin hammer teleport and AutoMount discovery build. F8/F9 recording, F10 snapshot, F11 marker. No teleport changes or auto mounting yet.')
+    '--notes','READ-ONLY Paladin hammer teleport and AutoMount discovery build. Ctrl+Alt+P/M recordings, Ctrl+Alt+O snapshot, Ctrl+Alt+K marker. Records hammer separation, mount anchors and state changes. No gameplay changes.')
 if ($Preview) { $args += '--prerelease' }
 & gh @args
 Assert-OK 'Publish GitHub release'
