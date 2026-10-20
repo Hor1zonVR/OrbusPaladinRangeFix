@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>OrbusPaladinRangeFix</AssemblyName>
+    <GameDir Condition="'$(GameDir)' == ''">$(LOCALAPPDATA)\OrbusRebornModdingInstances\My Orbus Renewed</GameDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="BepInEx.Core"><HintPath>$(GameDir)\BepInEx\core\BepInEx.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepInEx.Unity.IL2CPP"><HintPath>$(GameDir)\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Il2CppInterop.Runtime"><HintPath>$(GameDir)\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Il2Cppmscorlib"><HintPath>$(GameDir)\BepInEx\interop\Il2Cppmscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameDir)\BepInEx\interop\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.SceneManagementModule"><HintPath>$(GameDir)\BepInEx\interop\UnityEngine.SceneManagementModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="CheckReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GameDir)\BepInEx\core\BepInEx.Core.dll')" Text="Missing BepInEx Core; select a prepared RebornManager instance." />
+    <Error Condition="!Exists('$(GameDir)\BepInEx\core\BepInEx.Unity.IL2CPP.dll')" Text="Missing IL2CPP BepInEx loader." />
+    <Error Condition="!Exists('$(GameDir)\BepInEx\core\Il2CppInterop.Runtime.dll')" Text="Missing Il2CppInterop.Runtime." />
+    <Error Condition="!Exists('$(GameDir)\BepInEx\interop\Il2Cppmscorlib.dll')" Text="Missing generated interop; launch instance once." />
+    <Error Condition="!Exists('$(GameDir)\BepInEx\interop\UnityEngine.CoreModule.dll')" Text="Missing UnityEngine.CoreModule.dll." />
+    <Error Condition="!Exists('$(GameDir)\BepInEx\interop\UnityEngine.SceneManagementModule.dll')" Text="Missing UnityEngine.SceneManagementModule.dll." />
+  </Target>
+</Project>
