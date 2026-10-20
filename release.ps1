@@ -15,8 +15,7 @@ $required = @(
     'BepInEx\core\BepInEx.Unity.IL2CPP.dll',
     'BepInEx\core\Il2CppInterop.Runtime.dll',
     'BepInEx\interop\Il2Cppmscorlib.dll',
-    'BepInEx\interop\UnityEngine.CoreModule.dll',
-    'BepInEx\interop\UnityEngine.SceneManagementModule.dll'
+    'BepInEx\interop\UnityEngine.CoreModule.dll'
 )
 function Assert-OK([string]$what) {
     if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)." }
