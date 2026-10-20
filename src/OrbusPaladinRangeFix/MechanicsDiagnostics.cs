@@ -6,7 +6,9 @@ using System.Text;
 using BepInEx;
 using Il2CppInterop.Runtime;
 using UnityEngine;
+#if ORBUS_SCENE_MODULE
 using UnityEngine.SceneManagement;
+#endif
 
 namespace OrbusPaladinRangeFix;
 
@@ -147,9 +149,14 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
         Line("=== BEGIN " + mode + " " + seconds + " seconds UTC " +
              DateTimeOffset.UtcNow.ToString("O") + " ===");
         Line("LOCAL_PLAYER=" + (_player == null ? "NOT FOUND" : Clean(_player.name)));
+#if ORBUS_SCENE_MODULE
         Line("ACTIVE_SCENE=" + Clean(SceneManager.GetActiveScene().name));
+#else
+        Line("SCENE_DISCOVERY=local rig only (separate SceneManagementModule not available).");
+#endif
         Snapshot("START_" + mode);
 
+#if ORBUS_SCENE_MODULE
         try
         {
             var scene = SceneManager.GetActiveScene();
@@ -162,6 +169,13 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
         {
             Line("Scene root enumeration unavailable: " + Clean(ex.Message));
         }
+#else
+        // Safe fallback for older/generated interop sets lacking scene APIs.
+        // This probes the local hierarchy only, never other players or all resources.
+        if (_player != null) _sceneQueue.Enqueue(_player.transform.root);
+        Line("Queued local player hierarchy for incremental discovery; " +
+             "global scene discovery disabled because SceneManagementModule is absent.");
+#endif
         Flush();
     }
 
