@@ -53,7 +53,20 @@ if (-not (Valid $GameDir) -and (Test-Path -LiteralPath $instanceRoot)) {
     }
 }
 if (-not (Valid $GameDir)) {
-    throw "Game interop not found. Re-run with -GameDir 'C:\full\path\to\your\modding\instance'."
+    Write-Host 'No complete BepInEx/interop reference set was found.' -ForegroundColor Yellow
+    if (Test-Path -LiteralPath $instanceRoot) {
+        foreach ($candidate in @(Get-ChildItem -LiteralPath $instanceRoot -Directory)) {
+            $bep = Join-Path $candidate.FullName 'BepInEx'
+            if (-not (Test-Path -LiteralPath $bep)) { continue }
+            Write-Host ("Candidate: " + $candidate.FullName) -ForegroundColor Cyan
+            foreach ($file in $required) {
+                if (-not (Test-Path -LiteralPath (Join-Path $candidate.FullName $file))) {
+                    Write-Host ("  Missing: " + $file) -ForegroundColor Yellow
+                }
+            }
+        }
+    }
+    throw "No usable game interop found. Check BepInEx or pass -GameDir with your modding instance."
 }
 Write-Host "Compiling against $GameDir" -ForegroundColor Cyan
 $versionMatch = [regex]::Match((Get-Content $plugin -Raw),
