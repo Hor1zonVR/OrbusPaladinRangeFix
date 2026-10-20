@@ -4,17 +4,19 @@ This repository starts with an **investigation build**, not a gameplay patch. Th
 
 We're also investigating the game's mount/summon and combat-exit lifecycle for a separate optional `OrbusAutoMount` mod. That proposed mod should only call the normal client-side mounting interaction where the game permits it.
 
-## v0.1.0 — read-only diagnostic
+## v0.1.1 — read-only diagnostic
 
 This version **does not modify teleporting, hammer behaviour, mounting, combat, networking, or movement**.
 
-- **F8** starts a 60-second Paladin hammer/teleport recording.
-- **F9** starts a 90-second mount/combat recording.
-- **F10** queues a local-rig hierarchy/component snapshot.
-- **F11** records a precise manual event marker when you throw, teleport, mount or dismount.
+- **Ctrl+Alt+P** starts a 60-second Paladin hammer/teleport recording.
+- **Ctrl+Alt+M** starts a 90-second mount/combat recording.
+- **Ctrl+Alt+O** queues a local-rig hierarchy/component snapshot.
+- **Ctrl+Alt+K** records a precise manual event marker when you throw, teleport, mount or dismount.
 
 Open and focus the PC game window when pressing a key. Captures are saved under:
 `<your RM instance>\BepInEx\MechanicsDiagnostics\Mechanics_*.txt`
+
+The v0.1.1 update logs changes in hammer visibility, hammer distance from the right hand/player, and mount-anchor positions. It also rechecks the local hierarchy every five seconds to catch new objects. This remains read-only and does not identify the engine's actual mount-summoning or range-validation method. F8–F11 are intentionally no longer bound, because they conflict with RebornCam.
 
 The diagnostic inspects the local `PlayerRigv4`, Paladin/avatar and controller transforms, and gradually walks the active scene looking for likely mechanic objects. It processes only a small number of nodes per frame with hard caps, specifically to avoid the full-scene hitch that occurred in an earlier mod investigation. It does not inspect private networking or write gameplay state. The scene walk may miss dynamically spawned objects or names not matching its heuristic: that is something to refine from the first capture.
 
@@ -22,8 +24,8 @@ The diagnostic inspects the local `PlayerRigv4`, Paladin/avatar and controller t
 
 1. Build and publish the DLL with `release.ps1` (below).
 2. In **RebornManager → Instance → Client Mods**, install **OrbusPaladinRangeFix** from the GitHub release.
-3. Launch Orbus on the Paladin. Press **F8**, then test a short throw + teleport, a near-maximum-range throw + teleport and an out-of-range throw + teleport. Make notes of the sequence, and use F11 at important moments if convenient.
-4. Press **F9**, enter combat, exit combat, mount, dismount, enter combat mounted, and exit combat again. Allow the recording to end.
+3. Launch Orbus on the Paladin. Press **Ctrl+Alt+P**, then test a short throw + teleport, a near-maximum-range throw + teleport and an out-of-range throw + teleport. Make notes of the sequence, and use Ctrl+Alt+K at important moments if convenient.
+4. Press **Ctrl+Alt+M**, enter combat, exit combat, mount, dismount, enter combat mounted, and exit combat again. Allow the recording to end.
 5. Close the game. Run `inspect.ps1` and share the generated report alongside BepInEx LogOutput.log. Object names may identify character-related information; review your log before sharing it.
 
 The two recordings are separate: starting F9 during F8 intentionally ends the earlier recording. Wait for the first capture to finish.
