@@ -23,7 +23,7 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int key);
-    private const int F8 = 0x77, F9 = 0x78, F10 = 0x79, F11 = 0x7A;
+    private const int Ctrl = 0x11, Alt = 0x12, P = 0x50, M = 0x4D, O = 0x4F, K = 0x4B;
     private const int NodesPerFrame = 12;
     private const int MaxSceneNodes = 18000;
     private const int MaxDetails = 200;
@@ -34,6 +34,11 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
     private readonly HashSet<int> _seenCandidates = new();
     private readonly StringBuilder _pending = new(8192);
     private readonly Dictionary<string, Vector3> _lastPositions = new();
+    private readonly Dictionary<string, string> _lastStates = new();
+    private float _nextMountSample;
+    private float _nextHammerSample;
+    private float _lastHammerDistance = -1f;
+    private float _nextSceneRefresh;
 
     private string _report = "";
     private string _mode = "";
@@ -47,9 +52,10 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
     private int _detailCount;
     private int _snapshotNodes;
     private int _markers;
-    private bool _oldF8, _oldF9, _oldF10, _oldF11;
+    private bool _oldPaladin, _oldMount, _oldSnapshot, _oldMarker;
 
     private static bool Down(int key) => (GetAsyncKeyState(key) & 0x8000) != 0;
+    private static bool Chord(int key) => Down(Ctrl) && Down(Alt) && Down(key);
     private static string Clean(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "(empty)";
@@ -77,10 +83,10 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
             Directory.CreateDirectory(folder);
             _report = Path.Combine(folder,
                 "Mechanics_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff") + ".txt");
-            Line("OrbusPaladinRangeFix v0.1.0 - investigation only");
+            Line("OrbusPaladinRangeFix v0.1.1 - targeted investigation");
             Line("UTC " + DateTimeOffset.UtcNow.ToString("O"));
             Line("Read-only; no injected teleports, mounts, movement or network calls.");
-            Line("F8 Paladin, F9 mount/combat, F10 hierarchy, F11 manual event marker.");
+            Line("Ctrl+Alt+P Paladin, Ctrl+Alt+M mount/combat, Ctrl+Alt+O hierarchy, Ctrl+Alt+K event marker.");
             Line("This report may contain local Unity object names; review before sharing.");
             Flush();
             Plugin.Logger.LogInfo("[PaladinRangeFix] Diagnostic report: " + _report);
@@ -96,25 +102,36 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
         if (!Plugin.Enabled.Value) return;
 
         bool focused = Application.isFocused;
-        bool f8 = focused && Down(F8);
-        bool f9 = focused && Down(F9);
-        bool f10 = focused && Down(F10);
-        bool f11 = focused && Down(F11);
-        if (f8 && !_oldF8) Begin("PALADIN", Plugin.PaladinSeconds.Value);
-        if (f9 && !_oldF9) Begin("MOUNT_COMBAT", Plugin.MountSeconds.Value);
-        if (f10 && !_oldF10) Snapshot("MANUAL_F10");
-        if (f11 && !_oldF11) Marker();
-        _oldF8 = f8; _oldF9 = f9; _oldF10 = f10; _oldF11 = f11;
+        bool paladin = focused && Chord(P);
+        bool mount = focused && Chord(M);
+        bool snapshot = focused && Chord(O);
+        bool marker = focused && Chord(K);
+        if (paladin && !_oldPaladin) Begin("PALADIN", Plugin.PaladinSeconds.Value);
+        if (mount && !_oldMount) Begin("MOUNT_COMBAT", Plugin.MountSeconds.Value);
+        if (snapshot && !_oldSnapshot) Snapshot("MANUAL_CTRL_ALT_O");
+        if (marker && !_oldMarker) Marker();
+        _oldPaladin = paladin;
+        _oldMount = mount;
+        _oldSnapshot = snapshot;
+        _oldMarker = marker;
 
         // Snapshot work is also incremental: no long synchronous tree walks.
         PumpSnapshot();
         if (_mode.Length > 0)
         {
+            if (Time.realtimeSinceStartup >= _nextSceneRefresh)
+            {
+                _nextSceneRefresh = Time.realtimeSinceStartup + 5f;
+                if (_player != null && _sceneQueue.Count == 0 &&
+                    _sceneNodes < MaxSceneNodes)
+                    _sceneQueue.Enqueue(_player.transform);
+            }
             PumpScene();
             if (Time.realtimeSinceStartup >= _nextSample)
             {
                 _nextSample = Time.realtimeSinceStartup + Plugin.SampleInterval.Value;
                 Sample();
+                ProbeMechanics();
             }
             if (Time.realtimeSinceStartup >= _endTime)
             {
@@ -139,6 +156,11 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
         _mode = mode;
         _endTime = Time.realtimeSinceStartup + seconds;
         _nextSample = 0f;
+        _nextMountSample = 0f;
+        _nextHammerSample = 0f;
+        _nextSceneRefresh = Time.realtimeSinceStartup + 5f;
+        _lastHammerDistance = -1f;
+        _lastStates.Clear();
         _sceneNodes = 0;
         _detailCount = 0;
         _sceneQueue.Clear();
@@ -242,6 +264,75 @@ public sealed class MechanicsDiagnostics : MonoBehaviour
             }
         }
         catch (Exception ex) { Line("SAMPLE error: " + Clean(ex.Message)); }
+    }
+
+    // Record changes instead of dumping the whole VR hierarchy each frame.
+    private void ObserveState(string key, Transform? node)
+    {
+        string state = node == null ? "missing" :
+            "activeSelf=" + node.gameObject.activeSelf +
+            " activeInHierarchy=" + node.gameObject.activeInHierarchy;
+        if (_lastStates.TryGetValue(key, out string? prior) && prior == state)
+            return;
+        _lastStates[key] = state;
+        Line("STATE " + key + " " + state);
+    }
+
+    private void ProbeMechanics()
+    {
+        try
+        {
+            if (_player == null) return;
+            Transform rig = _player.transform;
+            Transform? avatar = Child(rig, "Avatar");
+            Transform? hand = Child(rig, "Controller (right)");
+            Transform? hammer = Child(rig, "Controller (right)/Hammer");
+            Transform? paladin = Child(rig, "Avatar/Paladin(Clone)");
+            Transform? mage = Child(rig, "Avatar/Runemage(Clone)");
+            Transform? mount = Child(rig, "Avatar/MountPosition");
+            Transform? startMount = Child(rig, "Avatar/StartMountPosition");
+            ObserveState("paladin", paladin);
+            ObserveState("runemage", mage);
+            ObserveState("hammer", hammer);
+            ObserveState("mountAnchor", mount);
+            ObserveState("startMountAnchor", startMount);
+            ObserveState("mountSpeedHud",
+                Child(rig, "TopHUD/Canvas/Slider/BombEffect/EffectIcons/MountSpeed"));
+            if (hammer != null)
+            {
+                Vector3 playerPos = avatar != null ? avatar.position : rig.position;
+                float d = Vector3.Distance(hammer.position, playerPos);
+                float handDistance = hand != null ?
+                    Vector3.Distance(hammer.position, hand.position) : -1f;
+                bool separated = handDistance > 1.3f || d > 2.0f;
+                if (separated && Time.realtimeSinceStartup >= _nextHammerSample)
+                {
+                    _nextHammerSample = Time.realtimeSinceStartup + 0.25f;
+                    Line("HAMMER_DISTANCE player=" + d.ToString("0.00") +
+                         "m rightHand=" + handDistance.ToString("0.00") +
+                         "m position=" + Position(hammer.position));
+                }
+                if (!separated && _lastHammerDistance >= 2f)
+                    Line("HAMMER_NEAR_HAND returnedToPlayerDistance=" +
+                        d.ToString("0.00") + "m");
+                _lastHammerDistance = d;
+            }
+            // The mount anchors remain present when dismounted. Only report
+            // their distance as evidence; never claim it is a mount state.
+            if (_mode == "MOUNT_COMBAT" && avatar != null &&
+                Time.realtimeSinceStartup >= _nextMountSample)
+            {
+                _nextMountSample = Time.realtimeSinceStartup + 1.5f;
+                Line("MOUNT_ANCHORS avatarToMount=" +
+                    (mount == null ? "missing" :
+                        Vector3.Distance(avatar.position, mount.position).ToString("0.00")) +
+                    "m avatarToStartMount=" +
+                    (startMount == null ? "missing" :
+                        Vector3.Distance(avatar.position, startMount.position).ToString("0.00")) +
+                    "m (not confirmed mount status)");
+            }
+        }
+        catch (Exception ex) { Line("MECHANICS probe error: " + Clean(ex.Message)); }
     }
 
     private void Watch(string label, Transform target)
